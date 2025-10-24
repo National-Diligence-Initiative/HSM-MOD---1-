@@ -790,6 +790,17 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 if __name__ == "__main__":
+    
+# -----------------------
+# Main execution
+# -----------------------
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(prog="hs_defensive_engine")
+    parser.add_argument("--cli", help="Process JSON file of report(s)", type=str)
+    parser.add_argument("--serve", help="Run HTTP API (requires flask)", action="store_true")
+    parser.add_argument("--port", help="Port for HTTP API", type=int, default=8000)
+    args = parser.parse_args()
     import os
     demonstrate_blockchain_nwi()
     demonstrate_tamper_resistance()
@@ -811,16 +822,6 @@ if __name__ == "__main__":
     for benefit in benefits:
         print(f"   {benefit}")
 
-# -----------------------
-# Main execution
-# -----------------------
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(prog="hs_defensive_engine")
-    parser.add_argument("--cli", help="Process JSON file of report(s)", type=str)
-    parser.add_argument("--serve", help="Run HTTP API (requires flask)", action="store_true")
-    parser.add_argument("--port", help="Port for HTTP API", type=int, default=8000)
-    args = parser.parse_args()
     
     if args.cli:
         example_cli_ingest(args.cli)
