@@ -21,7 +21,7 @@ import socket
 
 # Import HSM Defensive Engine
 sys.path.append('.')
-from hs_defensive_engine import TrajectoryMechanic, IncidentManager, append_ledger, utc_now_iso
+from HSM import TrajectoryMechanic, IncidentManager, append_ledger, utc_now_iso
 
 @dataclass
 class ProxyUtilizationMetrics:
