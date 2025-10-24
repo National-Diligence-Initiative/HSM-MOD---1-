@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # ===============================================================
-# TGDK Acorn Firewall - ULTIMATE UNIFIED EDITION
-# Author: Black Raven (Sean Tichenor)
-# License: TGDK BFE-ST-144SEC-ULTIMATE
+# IDN Acorn Firewall - ULTIMATE UNIFIED EDITION
+# Author: Codename White Terrantula 
 # Purpose: AI-aware defensive firewall with HexQuarantine routing,
 #          PID-level isolation, and cross-platform pkill-safe control.
 # ===============================================================
