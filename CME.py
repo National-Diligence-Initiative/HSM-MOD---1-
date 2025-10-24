@@ -17,7 +17,7 @@ import sys
 
 # Import the HSM Defensive Engine
 sys.path.append('.')
-from hs_defensive_engine import TrajectoryMechanic, IncidentManager, append_ledger, utc_now_iso
+from HSM import TrajectoryMechanic, IncidentManager, append_ledger, utc_now_iso
 
 class HSMEnhancedMiner:
     def __init__(self, difficulty: int = 4, base_reward: float = 0.001):
