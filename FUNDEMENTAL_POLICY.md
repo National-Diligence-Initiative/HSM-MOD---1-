@@ -81,7 +81,7 @@ Use of this mechanic implies adherence to this policy.All adjustments outside th
 
 ---
 
-End of Policy TGDK-MSC-01.
+End of Policy IDN-MSC-01.
 
 ---
 
