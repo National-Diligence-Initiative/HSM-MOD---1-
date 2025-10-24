@@ -4,6 +4,7 @@ Crypto-Mining Enhanced NWI Defensive Engine
 Mines cryptocurrency while processing defensive intelligence reports
 """
 
+import HSM
 import hashlib
 import time
 import json
