@@ -3,7 +3,7 @@
 Heat-Seeking Missile — Defensive Alert Engine (Non-violent)
 Purpose:
   - Ingest anonymized reports or automated signals
-  - Score each report by the TGDK Fivefold Trajectory (Courage, Dexterity, ClauseMatter, Audacity)
+  - Score each report by the Fivefold Trajectory (Courage, Dexterity, ClauseMatter, Audacity)
   - Group & geofence signals, create incidents for human review
   - Log artifacts to append-only ledger with SHA-256 checksums
   - Send alerts to webhook / email for authorized human reviewers
