@@ -76,3 +76,16 @@ Heat-Seeking Missile — Defensive Alert Engine (Non-violent)
 …and ending with the final print("Run with --serve ...") line.
 
 Run or submit the cell / code block.
+
+
+## — Embedding in AI platforms
+
+When you paste this into any AI workspace or notebook:
+
+Keep it in one contiguous code block.
+
+Ask the AI to “Run cell” or “Execute Python script.”
+
+Use the /report endpoint or --cli mode to feed test data.
+
+It will operate identically across all supported environments.
