@@ -227,3 +227,9 @@ if __name__=="__main__":
     demonstrate_hsm_enhanced_mining()
     # Safe continuous sub-quantum PMZ iteration
     pmz_live_loop(vector=0.0102, delay=0.01)
+    for i in range(5):
+    block = miner.mine_with_hsm_targeting(threat_reports, timeout=15)
+    if block:
+        blockchain._add_block(block)
+        print(f"[Cycle {i+1}] New block: {block['block_hash']}")
+
