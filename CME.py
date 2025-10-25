@@ -11,6 +11,11 @@ from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
 from engine import BlockchainNWIEngine
 import sys
+from web3 import Web3
+w3 = Web3(Web3.HTTPProvider("https://sepolia.infura.io/v3/YOUR_INFURA_KEY"))
+wallet_address = os.getenv("METAMASK_ADDRESS")
+private_key = os.getenv("PRIVATE_KEY")
+token_contract = w3.eth.contract(address=HSM_CONTRACT_ADDRESS, abi=HSM_ABI)
 sys.stdout.reconfigure(encoding='utf-8')
 
 
@@ -411,5 +416,6 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
