@@ -424,22 +424,6 @@ class NWITokenEconomy:
         else:
             print("💾 Local mode: reward recorded only in economy.json")
 
-
-def _save_economy(self):
-    """Write current economy state to economy.json safely."""
-    try:
-        data = {
-            "token_supply": round(self.token_supply, 6),
-            "total_wallets": len(self.wallets),
-            "wallets": self.wallets,
-            "transaction_history": self.transaction_history
-        }
-        with open("economy.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"[!] Failed to save economy.json: {e}")
-
-
 def _save_economy(self):
     """Write current economy state to economy.json safely."""
     try:
@@ -511,6 +495,7 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
 
