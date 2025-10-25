@@ -123,6 +123,14 @@ class HSMEnhancedMiner:
            result = (result ** 2 + 1) ** 0.5 / (1 + abs(result))
         return result
 
+    def _add_block(self, block):
+       """Add a validated block to the blockchain, computing hash if missing"""
+       if "block_hash" not in block:
+           block["block_hash"] = self._calculate_block_hash(block)
+
+        self.chain.append(block)
+        print(f"🧱 Block added to {self.network}: {block['block_hash'][:12]}")
+
     # -----------------------------------------------------------
     def generate_targeted_nonce(self, data:Dict[str,Any])->Dict[str,Any]:
         t = self.trajectory_engine.score(
