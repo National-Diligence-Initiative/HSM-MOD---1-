@@ -14,6 +14,12 @@ from typing import Dict, Any, List, Optional, Tuple
 import os
 import secrets
 import sys
+from dotenv import load_dotenv
+load_dotenv()
+
+METAMASK_ADDRESS = os.getenv("METAMASK_ADDRESS")
+print(f"Connected to wallet: {METAMASK_ADDRESS}")
+
 
 # Import the HSM Defensive Engine
 sys.path.append('.')
