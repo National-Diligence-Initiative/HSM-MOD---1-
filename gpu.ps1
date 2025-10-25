@@ -11,44 +11,32 @@ if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out
 
 Write-Host "[TGDK] 🔧 Detecting GPU resources..." -ForegroundColor Cyan
 
-# --- Detect GPU count ---
-$GPUCount = 0
-try {
-    $nvidia = & nvidia-smi.exe --query-gpu=name --format=csv,noheader 2>$null
-    if ($nvidia) {
-        $GPUCount = ($nvidia | Measure-Object).Count
-        Write-Host "[GPU] NVIDIA detected: $($nvidia[0]) ($GPUCount GPU(s))" -ForegroundColor Green
-    } else {
-        throw
-    }
-} catch {
-    try {
-        $rocm = & rocm-smi.exe --showproductname 2>$null
-        if ($rocm) {
-            $GPUCount = ($rocm | Select-String "GPU").Count
-            Write-Host "[GPU] AMD ROCm detected ($GPUCount GPU(s))" -ForegroundColor Green
-        } else {
-            throw
-        }
-    } catch {
-        Write-Host "[GPU] ⚠️  No GPU detected — using CPU fallback" -ForegroundColor Yellow
-    }
-}
-
-# --- Determine optimal concurrency dynamically ---
 if ($GPUCount -gt 0) {
-    # Query GPU memory to scale instance count
-    $gpuInfo = & nvidia-smi.exe --query-gpu=memory.total --format=csv,noheader 2>$null
-    $gpuMemory = [int]($gpuInfo[0].Split()[0])
-    
-    if ($gpuMemory -ge 16000) {
-        # High-memory GPU (RTX 3080, 4080, etc.)
-        $Instances = $GPUCount * 8
-    } elseif ($gpuMemory -ge 8000) {
-        # Mid-range GPU
-        $Instances = $GPUCount * 4
-    } else {
-        # Low-memory GPU
+    # Try to query memory safely
+    try {
+        $gpuInfo = & nvidia-smi.exe --query-gpu=memory.total --format=csv,noheader 2>$null
+        if ($gpuInfo -is [string]) { $gpuInfo = @($gpuInfo) }  # ensure it's an array
+
+        # Parse first GPU line robustly
+        $gpuLine = $gpuInfo[0].ToString()
+        $gpuMemory = ($gpuLine -replace '[^\d]', '') -as [int]
+
+        if ($gpuMemory -eq 0 -or $null -eq $gpuMemory) {
+            Write-Host "[GPU] ⚠️  Could not parse GPU memory, using fallback = 8192 MB" -ForegroundColor Yellow
+            $gpuMemory = 8192
+        }
+
+        if ($gpuMemory -ge 16000) {
+            $Instances = $GPUCount * 8
+        } elseif ($gpuMemory -ge 8000) {
+            $Instances = $GPUCount * 4
+        } else {
+            $Instances = $GPUCount * 2
+        }
+        Write-Host "[GPU] Memory per GPU: $gpuMemory MB → launching $Instances instances" -ForegroundColor Cyan
+
+    } catch {
+        Write-Host "[GPU] ⚠️  Could not detect GPU memory, defaulting to 2 instances" -ForegroundColor Yellow
         $Instances = $GPUCount * 2
     }
 } else {
@@ -56,7 +44,6 @@ if ($GPUCount -gt 0) {
     $CPUCount = [Environment]::ProcessorCount
     $Instances = [Math]::Max([int]($CPUCount * 0.75), 2)
 }
-
 
 # --- Launch miners ---
 for ($i = 1; $i -le $Instances; $i++) {
