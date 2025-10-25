@@ -85,6 +85,25 @@ def pmz_live_loop(vector: float = 0.0102, delay: float = 0.01, decay: float = 0.
             v = xp.asnumpy(v)
         return float(v[0])
 
+    def _save_economy(self):
+        """Write current economy state to economy.json safely."""
+        try:
+            data = {
+                "token_supply": round(self.token_supply, 6),
+                "total_wallets": len(self.wallets),
+                "wallets": self.wallets,
+                "transaction_history": self.transaction_history
+            }
+
+            with open("economy.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+
+            print("💾 economy.json updated successfully.")
+
+        except Exception as e:
+            print(f"[!] Failed to save economy.json: {e}")
+
+
 def subquantumlineate(self, cycles: int = 1000, gpu: bool = False):
         """Simulated PMZ recursion layer."""
         if gpu:
@@ -492,6 +511,7 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
 
