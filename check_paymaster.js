@@ -1,14 +1,11 @@
-import { ethers } from "ethers";
-import dotenv from "dotenv";
-
-dotenv.config();
+require('dotenv').config();
+const { ethers } = require('ethers');
 
 // === Load from .env ===
-// (replace with your actual variable names)
 const RPC_URL = process.env.RPC_URL || "https://sepolia.infura.io/v3/YOUR_KEY";
-const PAYMASTER_ADDR = process.env.PAYMASTER_ADDR;  // e.g., 0x...
+const PAYMASTER_ADDR = process.env.PAYMASTER_ADDR;
+
 const PAYMASTER_ABI = [
-  // --- replace with your real ABI ---
   {
     "inputs": [],
     "name": "getBalance",
