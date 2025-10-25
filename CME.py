@@ -9,6 +9,7 @@ import hashlib, time, json, threading, os, secrets, sys
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
+from blockchain_nwi_engine import BlockchainNWIEngine
 
 try:
     import cupy as xp  # GPU version
