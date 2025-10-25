@@ -332,14 +332,14 @@ class NWITokenEconomy:
         self.token_supply += amount
 
     # --- build transaction record ---
-         transaction = {
-             "tx_id": f"TOKEN-{int(time.time())}",
-             "type": "token_reward",
-             "from": "network",
-             "to": miner_wallet,
-             "amount": amount,
-             "block_hash": block_hash,
-             "timestamp": datetime.now(timezone.utc).isoformat()
+        transaction = {
+            "tx_id": f"TOKEN-{int(time.time())}",
+            "type": "token_reward",
+            "from": "network",
+            "to": miner_wallet,
+            "amount": amount,
+            "block_hash": block_hash,
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         self.wallets[miner_wallet]["transactions"].append(transaction)
@@ -458,6 +458,7 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
 
