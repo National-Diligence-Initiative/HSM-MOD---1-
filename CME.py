@@ -9,7 +9,64 @@ import hashlib, time, json, threading, os, secrets, sys
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
+
+try:
+    import cupy as xp  # GPU version
+except ImportError:
+    import numpy as np  # CPU fallback
+
+try:
+    import cupy as xp  # GPU array if available
+    gpu_enabled = True
+except ImportError:
+    xp = np
+    gpu_enabled = False
+
 load_dotenv()
+
+def pmz_gpu(iterations: int, size: int = 10_000):
+    x = xp.linspace(0.1, 1.0, size)
+    for _ in range(iterations):
+        x = xp.sqrt(x ** 2 + 1) / (1 + xp.abs(x))
+    return xp.asnumpy(x) if hasattr(x, "get") else x
+
+def pmz_live_loop(vector: float = 0.0102, delay: float = 0.01, decay: float = 0.999999):
+    """Optimized continuous PMZ loop with adaptive precision and optional GPU."""
+    v = xp.array([vector], dtype=xp.float64)
+    t0 = time.time()
+    iteration = 0
+
+    try:
+        while True:
+            # core PMZ transform — harmonic convergence function
+            v = xp.sqrt(v ** 2 + 1) / (1 + xp.abs(v))
+            if gpu_enabled:
+                v *= decay
+
+            iteration += 1
+            if iteration % 10000 == 0:
+                current = float(v[0]) if gpu_enabled else v[0]
+                elapsed = time.time() - t0
+                print(f"[PMZ] iter={iteration:,}  vector={current:.8f}  elapsed={elapsed:.2f}s")
+                t0 = time.time()
+            time.sleep(delay)
+
+    except KeyboardInterrupt:
+        print("\n🛑 PMZ loop stopped safely.")
+        if gpu_enabled:
+            v = xp.asnumpy(v)
+        return float(v[0])
+
+def subquantumlineate(self, cycles: int = 1000, gpu: bool = False):
+        """Simulated PMZ recursion layer."""
+        if gpu:
+            print("⚙️ Running sub-quantumlineation on GPU (CuPy).")
+            data = pmz_gpu(cycles)
+        else:
+            print("⚙️ Running sub-quantumlineation on CPU.")
+            data = [pmz_recurse(cycles, i / 1000) for i in range(100)]
+        self.nonce_patterns["pmz_signature"] = sum(data) / len(data)
+        return self.nonce_patterns["pmz_signature"]
 
 # --- optional wallet info ---
 METAMASK_ADDRESS = os.getenv("METAMASK_ADDRESS", "none")
@@ -56,6 +113,14 @@ class HSMEnhancedMiner:
         elif score >= .6: base_mult=1.2
         threat_mult = {"CRITICAL":3,"HIGH":2,"MEDIUM":1.5,"LOW":1}.get(threat_level,1)
         return self.base_reward * base_mult * threat_mult
+
+    def pmz_recurse(iterations: int, vector: float) -> float:
+        """Simulated sub-quantum PMZ iteration (safe finite recursion)."""
+        result = vector
+        for i in range(iterations):
+           # PMZ-style transformation (example harmonic oscillation)
+           result = (result ** 2 + 1) ** 0.5 / (1 + abs(result))
+        return result
 
     # -----------------------------------------------------------
     def generate_targeted_nonce(self, data:Dict[str,Any])->Dict[str,Any]:
@@ -160,3 +225,5 @@ def demonstrate_hsm_enhanced_mining():
 # ===================================================================
 if __name__=="__main__":
     demonstrate_hsm_enhanced_mining()
+    # Safe continuous sub-quantum PMZ iteration
+    pmz_live_loop(vector=0.0102, delay=0.01)
