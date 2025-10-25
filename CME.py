@@ -23,6 +23,17 @@ except ImportError:
 w3 = Web3(Web3.HTTPProvider("https://sepolia.infura.io/v3/YOUR_INFURA_KEY"))
 wallet_address = os.getenv("METAMASK_ADDRESS")
 private_key = os.getenv("PRIVATE_KEY")
+HSM_CONTRACT_ADDRESS = os.getenv("HSM_TOKEN_CONTRACT", "").strip()
+HSM_ABI_PATH = os.getenv("HSM_TOKEN_ABI", "hsm_token_abi.json")
+
+# Load ABI safely
+try:
+    with open(HSM_ABI_PATH, "r") as f:
+        HSM_ABI = json.load(f)
+except Exception as e:
+    print(f"[!] Could not load HSM ABI from {HSM_ABI_PATH}: {e}")
+    HSM_ABI = []
+
 token_contract = w3.eth.contract(address=HSM_CONTRACT_ADDRESS, abi=HSM_ABI)
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -481,6 +492,7 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
 
