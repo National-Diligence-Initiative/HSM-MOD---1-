@@ -256,7 +256,7 @@ def continuous_mining_loop(miner, threat_reports):
 if __name__ == "__main__":
     # Initialize miner and economy
     hsm_miner = HSMEnhancedMiner(difficulty=3, base_reward=0.01)
-    continuous_mining_loop(hsm_miner, threat_reports)
+
     econ = NWITokenEconomy()
     wallet = econ.create_wallet(hsm_miner.miner_id)
 
@@ -275,6 +275,7 @@ if __name__ == "__main__":
     pmz_vector = 0.0102
     iteration = 0
     base_delay = 0.05
+    continuous_mining_loop(hsm_miner, threat_reports)
 
     # Continuous subquantum loop
     while True:
