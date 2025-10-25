@@ -54,9 +54,31 @@ class BlockchainNWIEngine:
         return block
 
     def _add_block(self, block):
-        """Add a validated block to the blockchain"""
-        self.chain.append(block)
-        print(f"🧱 Block added to {self.network}: {block['block_hash'][:12]}")
+        """Add a validated block to the blockchain safely."""
+        try:
+            # Compute a hash if it's missing or empty
+            if not block.get("block_hash"):
+                # Defensive fallback if _calculate_block_hash isn't defined
+                try:
+                    block["block_hash"] = self._calculate_block_hash(block)
+                except Exception:
+                    import hashlib, json
+                    block["block_hash"] = hashlib.sha256(
+                        json.dumps(block, sort_keys=True).encode()
+                    ).hexdigest()
+
+            # Append block
+            self.chain.append(block)
+
+            # Short print
+            short_hash = block.get("block_hash", "NOHASH")[:12]
+            print(f"🧱 Block added to {self.network}: {short_hash}")
+
+        except Exception as e:
+            import json
+            print(f"[!] Failed to add block: {e}")
+            print(f"   Block data: {json.dumps(block, indent=2)[:400]}")
+
 
     def create_nwi_transaction(self, report, trajectory_score):
         """Simulate creation of a network intelligence transaction"""
@@ -68,3 +90,4 @@ class BlockchainNWIEngine:
             "trajectory_score": trajectory_score
         }
         return tx
+
