@@ -1,8 +1,6 @@
 <#
-NDI HSM Miner Dashboard
--------------------------
-Monitors HSM miner instances, GPU utilization, and block output in real time.
-Compatible with gpu.ps1 and CME.py instances.
+TGDK HSM Miner Dashboard (PowerShell)
+Real-time miner and GPU monitoring.
 #>
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -15,18 +13,19 @@ if (-not (Test-Path $LogDir)) {
 Write-Host "[TGDK] 🧭 Launching Miner Dashboard..." -ForegroundColor Cyan
 $gpuCmd = "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader"
 
-# Track previous stats
 $prevBlocks = 0
 $startTime  = Get-Date
 
 while ($true) {
-    # Calculate uptime safely
+
+    # calculate uptime safely
     $uptime = (Get-Date) - $startTime
     $uptimeStr = "{0:D2}:{1:D2}:{2:D2}" -f $uptime.Hours, $uptime.Minutes, $uptime.Seconds
+    $startedStr = $startTime.ToString("yyyy-MM-dd HH:mm:ss")
 
     Clear-Host
     Write-Host "=== TGDK / HSM Miner Dashboard ===" -ForegroundColor Cyan
-    Write-Host ("Started: {0:yyyy-MM-dd HH:mm:ss} | Uptime: {1}" -f $startTime, $uptimeStr)
+    Write-Host ("Started: $startedStr | Uptime: $uptimeStr")
     Write-Host "----------------------------------"
 
     # GPU status
@@ -55,7 +54,7 @@ while ($true) {
 
     Write-Host "----------------------------------"
 
-    # Parse miner logs for block count
+    # Parse miner logs
     $logFiles = Get-ChildItem $LogDir -Filter "miner_*.log" -ErrorAction SilentlyContinue
     $totalBlocks = 0
     foreach ($log in $logFiles) {
@@ -69,10 +68,10 @@ while ($true) {
     Write-Host ("[Blocks] Total: {0} | Δ {1} since last refresh" -f $totalBlocks, $delta)
     $prevBlocks = $totalBlocks
 
-    # Quick summary of active miner jobs (launched via gpu.ps1)
     try {
         $running = Get-Process | Where-Object { $_.ProcessName -match "python" -and $_.Path -match "CME.py" }
-        Write-Host ("[Instances] {0} active miner process(es)" -f ($running.Count)) -ForegroundColor Green
+        $count = if ($running) { $running.Count } else { 0 }
+        Write-Host ("[Instances] {0} active miner process(es)" -f $count) -ForegroundColor Green
     } catch {
         Write-Host "[Instances] ⚠️ Unable to detect active miners" -ForegroundColor Yellow
     }
