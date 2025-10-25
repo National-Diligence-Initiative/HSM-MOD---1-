@@ -207,29 +207,96 @@ class NWITokenEconomy:
 
 # ===================================================================
 def demonstrate_hsm_enhanced_mining():
-    miner=HSMEnhancedMiner(difficulty=3,base_reward=0.01)
-    econ=NWITokenEconomy(); wallet=econ.create_wallet(miner.miner_id)
+    miner = HSMEnhancedMiner(difficulty=3, base_reward=0.01)
+    econ = NWITokenEconomy()
+    wallet = econ.create_wallet(miner.miner_id)
 
-    reports=[
-        {"id":"LIVE-1","lat":37.22,"lon":-77.40,"courage":0.8,"dexterity":0.7,"clause_matter":0.85,"audacity":0.6},
-        {"id":"LIVE-2","lat":37.54,"lon":-77.43,"courage":0.7,"dexterity":0.6,"clause_matter":0.75,"audacity":0.5}
+    reports = [
+        {"id": "LIVE-1", "lat": 37.22, "lon": -77.40,
+         "courage": 0.8, "dexterity": 0.7, "clause_matter": 0.85, "audacity": 0.6},
+        {"id": "LIVE-2", "lat": 37.54, "lon": -77.43,
+         "courage": 0.7, "dexterity": 0.6, "clause_matter": 0.75, "audacity": 0.5}
     ]
 
-    block=miner.mine_with_hsm_targeting(reports)
-    if block:
-        econ.credit(wallet,miner.total_rewards)
-        print(f"Wallet {wallet} credited {miner.total_rewards:.6f}")
-    print("=== ECONOMY ===",econ.stats())
+    print("🔧 HSM Miner Initialized:", miner.miner_id)
+    iteration = 0
+    pmz_vector = 0.0102
+
+    while True:  # continuous mining loop
+        iteration += 1
+        pmz_vector = (pmz_vector * 1.00037) % 1.0  # PMZ drift / subquantum lineation
+        start_nonce = int(time.time() * 1000) % 1000000
+        miner.base_reward = 0.01 * (1.0 + pmz_vector)
+
+        block = miner.mine_with_hsm_targeting(reports, timeout=10)
+        if block:
+            econ.distribute_rewards(wallet, miner.base_reward, block.get("block_hash", "N/A"))
+            print(f"✅ Block mined | Score {block['threat_score']:.3f} | Reward {miner.base_reward:.6f}")
+        else:
+            print("⏳ No block found this cycle.")
+
+        if iteration % 10 == 0:
+            print(f"=== ECONOMY === {{'wallets': {len(econ.wallets)}, 'supply': {econ.token_supply:.3f}, 'txs': {len(econ.transaction_history)}}}")
+            print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  time={time.strftime('%H:%M:%S')}")
+
+        time.sleep(1)
+
+def continuous_mining_loop(miner, threat_reports):
+    while True:
+        block = miner.mine_with_hsm_targeting(threat_reports, timeout=20)
+        if block:
+            blockchain._add_block(block)
+            print(f"[+] Block mined: {block['block_hash']} | Reward: {block['threat_score']:.3f}")
+        else:
+            print("[-] Timeout, retrying...")
+        time.sleep(2)
+
+continuous_mining_loop(hsm_miner, threat_reports)
 
 
 # ===================================================================
-if __name__=="__main__":
-    demonstrate_hsm_enhanced_mining()
-    # Safe continuous sub-quantum PMZ iteration
-    pmz_live_loop(vector=0.0102, delay=0.01)
-    for i in range(5):
-        block = miner.mine_with_hsm_targeting(threat_reports, timeout=15)
-    if block:
-        blockchain._add_block(block)
-        print(f"[Cycle {i+1}] New block: {block['block_hash']}")
+if __name__ == "__main__":
+    # Initialize miner and economy
+    hsm_miner = HSMEnhancedMiner(difficulty=3, base_reward=0.01)
+    econ = NWITokenEconomy()
+    wallet = econ.create_wallet(hsm_miner.miner_id)
 
+    # Example threat data
+    threat_reports = [
+        {"id": "LIVE-1", "lat": 37.22, "lon": -77.40,
+         "courage": 0.8, "dexterity": 0.7, "clause_matter": 0.85, "audacity": 0.6},
+        {"id": "LIVE-2", "lat": 37.54, "lon": -77.43,
+         "courage": 0.7, "dexterity": 0.6, "clause_matter": 0.75, "audacity": 0.5}
+    ]
+
+    print(f"Connected to wallet: {wallet}")
+    print(f"🔧 HSM Miner Initialized: {hsm_miner.miner_id}")
+
+    # PMZ initialization
+    pmz_vector = 0.0102
+    iteration = 0
+    base_delay = 0.05
+
+    # Continuous subquantum loop
+    while True:
+        iteration += 1
+        pmz_vector = (pmz_vector * 1.00037) % 1.0  # self-stabilizing PMZ rotation
+
+        # Update difficulty dynamically based on PMZ vector balance
+        hsm_miner.difficulty = max(1, int(4 * (1.0 - pmz_vector)))
+        start_nonce = int(time.time() * 1000) % 1000000
+
+        # Attempt mining
+        block = hsm_miner.mine_with_hsm_targeting(threat_reports, timeout=12)
+        if block:
+            econ.distribute_rewards(wallet, hsm_miner.base_reward, block.get("block_hash", "N/A"))
+            print(f"✅ Block mined | Score {block['threat_score']:.3f} | Reward {hsm_miner.base_reward:.6f}")
+        else:
+            print("⏳ No block found this cycle.")
+
+        # Every 20 iterations print system state
+        if iteration % 20 == 0:
+            print(f"=== ECONOMY === {{'wallets': {len(econ.wallets)}, 'supply': {econ.token_supply:.3f}, 'txs': {len(econ.transaction_history)}}}")
+            print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
+
+        time.sleep(base_delay)
