@@ -4,7 +4,6 @@ Auto-detects GPU or CPU capacity and launches optimal CME.py instances
 Logs output per instance in .\logs\
 #>
 
-# --- Configuration ---
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $Python = "python.exe"
 $LogDir = Join-Path $ScriptDir "logs"
@@ -57,12 +56,13 @@ for ($i = 1; $i -le $Instances; $i++) {
         $env:CUDA_VISIBLE_DEVICES = "$GPUIndex"
     }
 
-    Start-Process -FilePath $Python `
-        -ArgumentList "$ScriptDir\CME.py" `
-        -RedirectStandardOutput $LogFile `
-        -RedirectStandardError $LogFile `
-        -WindowStyle Hidden
-    Start-Sleep -Seconds 1
+    # Use Out-File for non-conflicting output redirection
+    Start-Job -ScriptBlock {
+        param($Python, $ScriptDir, $LogFile)
+        & $Python "$ScriptDir\CME.py" *>> $LogFile
+    } -ArgumentList $Python, $ScriptDir, $LogFile | Out-Null
+
+    Start-Sleep -Milliseconds 500
 }
 
 Write-Host "[TGDK] ✅ All HSM miner instances launched."
