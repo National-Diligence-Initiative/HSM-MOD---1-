@@ -89,6 +89,75 @@ except ImportError:
 # ===================================================================
 # MAIN MINER
 # ===================================================================
+
+class NWITokenEconomy:
+    def __init__(self):
+        self.token_supply = 0.0
+        self.wallets = {}
+        self.transaction_history = []
+
+    def create_wallet(self, owner_id: str) -> str:
+        """Create a new wallet for an entity."""
+        wallet_address = f"WALLET_{hashlib.sha256(owner_id.encode()).hexdigest()[:16]}"
+        self.wallets[wallet_address] = {
+            "owner": owner_id,
+            "balance": 0.0,
+            "created": datetime.now(timezone.utc).isoformat(),
+            "transactions": []
+        }
+        return wallet_address
+
+    def distribute_rewards(self, miner_wallet: str, amount: float, block_hash: str):
+        """Distribute mining rewards to a wallet and record transaction."""
+        if miner_wallet not in self.wallets:
+            self.wallets[miner_wallet] = {
+                "owner": "unknown_miner",
+                "balance": 0.0,
+                "created": datetime.now(timezone.utc).isoformat(),
+                "transactions": []
+            }
+
+        # Credit wallet and update supply
+        self.wallets[miner_wallet]["balance"] += amount
+        self.token_supply += amount
+
+        # Record transaction
+        transaction = {
+            "tx_id": f"TOKEN-{int(time.time())}",
+            "type": "token_reward",
+            "from": "network",
+            "to": miner_wallet,
+            "amount": amount,
+            "block_hash": block_hash,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+        self.wallets[miner_wallet]["transactions"].append(transaction)
+        self.transaction_history.append(transaction)
+
+        # Persist to disk
+        self._save_economy()
+        print(f"💰 {amount:.6f} HSM tokens rewarded to {miner_wallet}")
+
+    def _save_economy(self):
+        """Write current economy state to economy.json"""
+        data = {
+            "token_supply": self.token_supply,
+            "total_wallets": len(self.wallets),
+            "wallets": self.wallets,
+            "transaction_history": self.transaction_history
+        }
+        with open("economy.json", "w") as f:
+            json.dump(data, f, indent=2)
+
+    def get_economy_stats(self):
+        return {
+            "token_supply": self.token_supply,
+            "total_wallets": len(self.wallets),
+            "total_transactions": len(self.transaction_history)
+        }
+
+
 class HSMEnhancedMiner:
     def __init__(self, difficulty:int=4, base_reward:float=0.001):
         self.difficulty = difficulty
