@@ -1,5 +1,5 @@
 <#
-TGDK HSM Miner Dashboard (PowerShell)
+NDI HSM Miner Dashboard (PowerShell)
 Real-time miner and GPU monitoring.
 #>
 
@@ -24,7 +24,7 @@ while ($true) {
     $startedStr = $startTime.ToString("yyyy-MM-dd HH:mm:ss")
 
     Clear-Host
-    Write-Host "=== TGDK / HSM Miner Dashboard ===" -ForegroundColor Cyan
+    Write-Host "=== NDI / HSM Miner Dashboard ===" -ForegroundColor Cyan
     Write-Host ("Started: $startedStr | Uptime: $uptimeStr")
     Write-Host "----------------------------------"
 
