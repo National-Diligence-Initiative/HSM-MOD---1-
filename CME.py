@@ -236,6 +236,24 @@ class HSMEnhancedMiner:
             print(f"[!] Failed to add block: {e}")
         print(f"   Block data: {json.dumps(block, indent=2)[:400]}")
 
+    def bridge_rewards_to_eth(econ, bridge_wallet, rate=0.0001):
+        """
+        Converts HSM tokens to ETH equivalent for gas use.
+        rate = ETH per HSM
+        """
+        total = econ.token_supply
+        eth_available = total * rate
+        print(f"[Bridge] {total:.4f} HSM → {eth_available:.6f} ETH gas-equivalent")
+
+    # Log locally (you’d replace this with contract interaction)
+        with open("bridge_log.json", "a") as f:
+            json.dump({
+                "timestamp": datetime.utcnow().isoformat(),
+                "hsm_used": total,
+                "eth_equivalent": eth_available,
+                "wallet": bridge_wallet
+            }, f)
+            f.write("\n")
 
 
     # -----------------------------------------------------------
@@ -495,6 +513,7 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
 
