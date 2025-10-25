@@ -106,7 +106,8 @@ class HSMEnhancedMiner:
         self.threat_based_rewards = 0.0
         self.nonce_patterns = {}
         self.threat_profiles = {}
-        print(f"🔧 HSM Miner Initialized: {self.miner_id}")
+        print(f"[HSM🔧] Miner Initialized: {self.miner_id}")
+
 
     # -----------------------------------------------------------
     def calculate_mining_reward(self, score:float, threat_level:str)->float:
@@ -410,4 +411,5 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
