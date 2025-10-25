@@ -1,26 +1,17 @@
-require('dotenv').config();
-const { ethers } = require('ethers');
-
-// === Load from .env ===
-const RPC_URL = process.env.RPC_URL || "https://sepolia.infura.io/v3/YOUR_KEY";
-const PAYMASTER_ADDR = process.env.PAYMASTER_ADDR;
-
-const PAYMASTER_ABI = [
-  {
-    "inputs": [],
-    "name": "getBalance",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-    "stateMutability": "view",
-    "type": "function"
-  }
-];
+import { ethers } from "hardhat";
+import { EntryPoint__factory, VerifyingPaymaster__factory } 
+  from "@account-abstraction/contracts";
 
 async function main() {
-  const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-  const paymaster = new ethers.Contract(PAYMASTER_ADDR, PAYMASTER_ABI, provider);
+  const [deployer] = await ethers.getSigners();
+  console.log("Deploying from:", deployer.address);
 
-  const balance = await paymaster.getBalance();
-  console.log(`[TGDK] Paymaster Balance: ${ethers.utils.formatEther(balance)} ETH`);
+  const entryPoint = await new EntryPoint__factory(deployer).deploy();
+  const paymaster = await new VerifyingPaymaster__factory(deployer)
+      .deploy(await entryPoint.getAddress(), deployer.address);
+
+  console.log("EntryPoint:", await entryPoint.getAddress());
+  console.log("Paymaster:", await paymaster.getAddress());
 }
 
-main().catch(err => console.error(err));
+main().catch(console.error);
