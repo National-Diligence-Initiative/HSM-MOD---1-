@@ -1,10 +1,12 @@
 <#
-NDI HSM Miner Dashboard (PowerShell)
-Real-time miner and GPU monitoring.
+NDI HSM Miner Dashboard
+Monitors TGDK / HSM miner performance, GPU load, blocks, and wallet earnings.
 #>
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$LogDir = Join-Path $ScriptDir "logs"
+$LogDir    = Join-Path $ScriptDir "logs"
+$Economy   = Join-Path $ScriptDir "economy.json"
+
 if (-not (Test-Path $LogDir)) {
     Write-Host "[!] No log directory found. Start gpu.ps1 first." -ForegroundColor Yellow
     exit
@@ -14,21 +16,29 @@ Write-Host "[TGDK] 🧭 Launching Miner Dashboard..." -ForegroundColor Cyan
 $gpuCmd = "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader"
 
 $prevBlocks = 0
-$startTime  = Get-Date
+$prevRewards = 0
+$startTime = Get-Date
+
+function Get-WalletData {
+    param($Path)
+    if (-not (Test-Path $Path)) { return $null }
+    try {
+        $json = Get-Content $Path -Raw | ConvertFrom-Json
+        return $json
+    } catch { return $null }
+}
 
 while ($true) {
-
-    # calculate uptime safely
     $uptime = (Get-Date) - $startTime
-    $uptimeStr = "{0:D2}:{1:D2}:{2:D2}" -f $uptime.Hours, $uptime.Minutes, $uptime.Seconds
+    $uptimeStr  = "{0:D2}:{1:D2}:{2:D2}" -f $uptime.Hours, $uptime.Minutes, $uptime.Seconds
     $startedStr = $startTime.ToString("yyyy-MM-dd HH:mm:ss")
 
     Clear-Host
-    Write-Host "=== NDI / HSM Miner Dashboard ===" -ForegroundColor Cyan
-    Write-Host ("Started: $startedStr | Uptime: $uptimeStr")
+    Write-Host "=== TGDK / HSM Miner Dashboard ===" -ForegroundColor Cyan
+    Write-Host ("Started: " + $startedStr + " | Uptime: " + $uptimeStr)
     Write-Host "----------------------------------"
 
-    # GPU status
+    # GPU Status
     try {
         $gpuStatus = & cmd /c $gpuCmd 2>$null
         if ($gpuStatus) {
@@ -54,7 +64,7 @@ while ($true) {
 
     Write-Host "----------------------------------"
 
-    # Parse miner logs
+    # Block tracking
     $logFiles = Get-ChildItem $LogDir -Filter "miner_*.log" -ErrorAction SilentlyContinue
     $totalBlocks = 0
     foreach ($log in $logFiles) {
@@ -63,11 +73,27 @@ while ($true) {
             $totalBlocks += $count
         } catch {}
     }
-
     $delta = $totalBlocks - $prevBlocks
     Write-Host ("[Blocks] Total: {0} | Δ {1} since last refresh" -f $totalBlocks, $delta)
     $prevBlocks = $totalBlocks
 
+    # Wallet & Rewards
+    $walletData = Get-WalletData $Economy
+    if ($walletData) {
+        $supply = [math]::Round($walletData.supply, 6)
+        $txs = $walletData.txs
+        $wallets = $walletData.wallets
+        $rate = 0
+        if ($uptime.TotalHours -gt 0) {
+            $rate = [math]::Round(($supply - $prevRewards) / $uptime.TotalHours, 6)
+        }
+        Write-Host ("[Wallets] {0} | [Supply] {1} TGDK | [Txs] {2} | [Rate] {3} TGDK/hr" -f $wallets, $supply, $txs, $rate)
+        $prevRewards = $supply
+    } else {
+        Write-Host "[Wallet] No economy.json found — mining offline." -ForegroundColor Yellow
+    }
+
+    # Miner instance detection
     try {
         $running = Get-Process | Where-Object { $_.ProcessName -match "python" -and $_.Path -match "CME.py" }
         $count = if ($running) { $running.Count } else { 0 }
