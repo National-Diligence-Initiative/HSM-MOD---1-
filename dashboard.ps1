@@ -1,5 +1,5 @@
 <#
-TGDK HSM Miner Dashboard
+NDI HSM Miner Dashboard
 -------------------------
 Monitors HSM miner instances, GPU utilization, and block output in real time.
 Compatible with gpu.ps1 and CME.py instances.
