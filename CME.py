@@ -350,41 +350,41 @@ class NWITokenEconomy:
             print(f"✅ {amount:.6f} HSM tokens rewarded to {miner_wallet}")
 
     # --- optional on-chain broadcast ---
-    metamask_addr = os.getenv("METAMASK_ADDRESS")
-    priv_key = os.getenv("PRIVATE_KEY")
-    rpc_url = os.getenv("RPC_URL", "https://sepolia.infura.io/v3/YOUR_INFURA_KEY")
-    token_address = os.getenv("HSM_TOKEN_CONTRACT")   # optional ERC-20 contract
+        metamask_addr = os.getenv("METAMASK_ADDRESS")
+        priv_key = os.getenv("PRIVATE_KEY")
+        rpc_url = os.getenv("RPC_URL", "https://sepolia.infura.io/v3/YOUR_INFURA_KEY")
+        token_address = os.getenv("HSM_TOKEN_CONTRACT")   # optional ERC-20 contract
 
-    if load_web3 and metamask_addr and priv_key and token_address:
-        try:
-            w3 = Web3(Web3.HTTPProvider(rpc_url))
-            if not w3.is_connected():
-                print("⚠️ Web3 connection failed; local record only.")
-                return
+        if load_web3 and metamask_addr and priv_key and token_address:
+            try:
+                w3 = Web3(Web3.HTTPProvider(rpc_url))
+                if not w3.is_connected():
+                    print("⚠️ Web3 connection failed; local record only.")
+                    return
 
-            abi_path = os.getenv("HSM_TOKEN_ABI", "hsm_token_abi.json")
-            with open(abi_path, "r") as f:
-                token_abi = json.load(f)
+                abi_path = os.getenv("HSM_TOKEN_ABI", "hsm_token_abi.json")
+                with open(abi_path, "r") as f:
+                    token_abi = json.load(f)
 
-            token = w3.eth.contract(address=token_address, abi=token_abi)
-            decimals = token.functions.decimals().call()
-            wei_amount = int(amount * (10 ** decimals))
+                token = w3.eth.contract(address=token_address, abi=token_abi)
+                decimals = token.functions.decimals().call()
+                wei_amount = int(amount * (10 ** decimals))
 
-            tx = token.functions.transfer(metamask_addr, wei_amount).build_transaction({
-                "from": metamask_addr,
-                "nonce": w3.eth.get_transaction_count(metamask_addr),
-                "gas": 100000,
-                "gasPrice": w3.to_wei("20", "gwei"),
-            })
+                tx = token.functions.transfer(metamask_addr, wei_amount).build_transaction({
+                    "from": metamask_addr,
+                    "nonce": w3.eth.get_transaction_count(metamask_addr),
+                    "gas": 100000,
+                    "gasPrice": w3.to_wei("20", "gwei"),
+                })
 
-            signed = w3.eth.account.sign_transaction(tx, private_key=priv_key)
-            tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
-            print(f"🌐 Sent {amount:.6f} HSM to {metamask_addr} on-chain → TX: {tx_hash.hex()}")
+                signed = w3.eth.account.sign_transaction(tx, private_key=priv_key)
+                tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+                print(f"🌐 Sent {amount:.6f} HSM to {metamask_addr} on-chain → TX: {tx_hash.hex()}")
 
-        except Exception as e:
-            print(f"⚠️ On-chain send failed: {e}")
-    else:
-        print("💾 Local mode: reward recorded only in economy.json")
+            except Exception as e:
+                print(f"⚠️ On-chain send failed: {e}")
+        else:
+            print("💾 Local mode: reward recorded only in economy.json")
 
 
 def _save_economy(self):
@@ -458,6 +458,7 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
 
