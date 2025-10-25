@@ -35,15 +35,28 @@ try {
     }
 }
 
-# --- Determine optimal concurrency ---
+# --- Determine optimal concurrency dynamically ---
 if ($GPUCount -gt 0) {
-    $Instances = $GPUCount * 2
+    # Query GPU memory to scale instance count
+    $gpuInfo = & nvidia-smi.exe --query-gpu=memory.total --format=csv,noheader 2>$null
+    $gpuMemory = [int]($gpuInfo[0].Split()[0])
+    
+    if ($gpuMemory -ge 16000) {
+        # High-memory GPU (RTX 3080, 4080, etc.)
+        $Instances = $GPUCount * 8
+    } elseif ($gpuMemory -ge 8000) {
+        # Mid-range GPU
+        $Instances = $GPUCount * 4
+    } else {
+        # Low-memory GPU
+        $Instances = $GPUCount * 2
+    }
 } else {
+    # CPU fallback
     $CPUCount = [Environment]::ProcessorCount
-    $Instances = [Math]::Max([int]($CPUCount / 2), 1)
+    $Instances = [Math]::Max([int]($CPUCount * 0.75), 2)
 }
 
-Write-Host "[TGDK] Launching $Instances concurrent HSM miner instance(s)..." -ForegroundColor Cyan
 
 # --- Launch miners ---
 for ($i = 1; $i -le $Instances; $i++) {
