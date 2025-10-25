@@ -1,15 +1,18 @@
-#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Crypto-Mining Enhanced NWI Defensive Engine
 HSM-Enhanced Crypto Mining Engine
 Simulated version: all logic preserved, syntax fixed.
 """
 
-import hashlib, time, json, threading, os, secrets, sys
+import hashlib, time, json, threading, os, secrets
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
 from engine import BlockchainNWIEngine
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+
 
 try:
     import cupy as xp  # GPU version
@@ -407,3 +410,4 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
