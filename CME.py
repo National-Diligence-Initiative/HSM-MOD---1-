@@ -255,6 +255,7 @@ def continuous_mining_loop(miner, threat_reports):
 # ===================================================================
 if __name__ == "__main__":
     # Initialize miner and economy
+    blockchain = BlockchainNWIEngine(network="nwi_mainnet")
     hsm_miner = HSMEnhancedMiner(difficulty=3, base_reward=0.01)
 
     econ = NWITokenEconomy()
