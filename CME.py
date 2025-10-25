@@ -317,7 +317,8 @@ class NWITokenEconomy:
         return wallet_address
 
     def distribute_rewards(self, miner_wallet: str, amount: float, block_hash: str):
-        """Distribute mining rewards to a wallet and record transaction."""
+        """Distribute mining rewards to a wallet, record locally, and optionally send to MetaMask."""
+        # --- initialize wallet if missing ---
         if miner_wallet not in self.wallets:
             self.wallets[miner_wallet] = {
                 "owner": "unknown_miner",
@@ -326,38 +327,79 @@ class NWITokenEconomy:
                 "transactions": []
             }
 
-        # Credit wallet and update supply
+        # --- credit wallet and supply ---
         self.wallets[miner_wallet]["balance"] += amount
         self.token_supply += amount
 
-        # Record transaction
-        transaction = {
-            "tx_id": f"TOKEN-{int(time.time())}",
-            "type": "token_reward",
-            "from": "network",
-            "to": miner_wallet,
-            "amount": amount,
-            "block_hash": block_hash,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+    # --- build transaction record ---
+         transaction = {
+             "tx_id": f"TOKEN-{int(time.time())}",
+             "type": "token_reward",
+             "from": "network",
+             "to": miner_wallet,
+             "amount": amount,
+             "block_hash": block_hash,
+             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         self.wallets[miner_wallet]["transactions"].append(transaction)
         self.transaction_history.append(transaction)
 
-        # Persist to disk
-        self._save_economy()
-        print(f"?? {amount:.6f} HSM tokens rewarded to {miner_wallet}")
+         # --- persist locally ---
+            self._save_economy()
+            print(f"✅ {amount:.6f} HSM tokens rewarded to {miner_wallet}")
 
-    def _save_economy(self):
-        """Write current economy state to economy.json"""
+    # --- optional on-chain broadcast ---
+    metamask_addr = os.getenv("METAMASK_ADDRESS")
+    priv_key = os.getenv("PRIVATE_KEY")
+    rpc_url = os.getenv("RPC_URL", "https://sepolia.infura.io/v3/YOUR_INFURA_KEY")
+    token_address = os.getenv("HSM_TOKEN_CONTRACT")   # optional ERC-20 contract
+
+    if load_web3 and metamask_addr and priv_key and token_address:
+        try:
+            w3 = Web3(Web3.HTTPProvider(rpc_url))
+            if not w3.is_connected():
+                print("⚠️ Web3 connection failed; local record only.")
+                return
+
+            abi_path = os.getenv("HSM_TOKEN_ABI", "hsm_token_abi.json")
+            with open(abi_path, "r") as f:
+                token_abi = json.load(f)
+
+            token = w3.eth.contract(address=token_address, abi=token_abi)
+            decimals = token.functions.decimals().call()
+            wei_amount = int(amount * (10 ** decimals))
+
+            tx = token.functions.transfer(metamask_addr, wei_amount).build_transaction({
+                "from": metamask_addr,
+                "nonce": w3.eth.get_transaction_count(metamask_addr),
+                "gas": 100000,
+                "gasPrice": w3.to_wei("20", "gwei"),
+            })
+
+            signed = w3.eth.account.sign_transaction(tx, private_key=priv_key)
+            tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+            print(f"🌐 Sent {amount:.6f} HSM to {metamask_addr} on-chain → TX: {tx_hash.hex()}")
+
+        except Exception as e:
+            print(f"⚠️ On-chain send failed: {e}")
+    else:
+        print("💾 Local mode: reward recorded only in economy.json")
+
+
+def _save_economy(self):
+    """Write current economy state to economy.json safely."""
+    try:
         data = {
-            "token_supply": self.token_supply,
+            "token_supply": round(self.token_supply, 6),
             "total_wallets": len(self.wallets),
             "wallets": self.wallets,
             "transaction_history": self.transaction_history
         }
-        with open("economy.json", "w") as f:
+        with open("economy.json", "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"[!] Failed to save economy.json: {e}")
 
     def get_economy_stats(self):
         return {
@@ -416,6 +458,7 @@ if __name__ == "__main__":
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(base_delay)
+
 
 
 
