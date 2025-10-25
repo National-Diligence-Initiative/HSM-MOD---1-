@@ -9,7 +9,7 @@ import hashlib, time, json, threading, os, secrets, sys
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
-from blockchain_nwi_engine import BlockchainNWIEngine
+from engine import BlockchainNWIEngine
 
 try:
     import cupy as xp  # GPU version
@@ -89,75 +89,6 @@ except ImportError:
 # ===================================================================
 # MAIN MINER
 # ===================================================================
-
-class NWITokenEconomy:
-    def __init__(self):
-        self.token_supply = 0.0
-        self.wallets = {}
-        self.transaction_history = []
-
-    def create_wallet(self, owner_id: str) -> str:
-        """Create a new wallet for an entity."""
-        wallet_address = f"WALLET_{hashlib.sha256(owner_id.encode()).hexdigest()[:16]}"
-        self.wallets[wallet_address] = {
-            "owner": owner_id,
-            "balance": 0.0,
-            "created": datetime.now(timezone.utc).isoformat(),
-            "transactions": []
-        }
-        return wallet_address
-
-    def distribute_rewards(self, miner_wallet: str, amount: float, block_hash: str):
-        """Distribute mining rewards to a wallet and record transaction."""
-        if miner_wallet not in self.wallets:
-            self.wallets[miner_wallet] = {
-                "owner": "unknown_miner",
-                "balance": 0.0,
-                "created": datetime.now(timezone.utc).isoformat(),
-                "transactions": []
-            }
-
-        # Credit wallet and update supply
-        self.wallets[miner_wallet]["balance"] += amount
-        self.token_supply += amount
-
-        # Record transaction
-        transaction = {
-            "tx_id": f"TOKEN-{int(time.time())}",
-            "type": "token_reward",
-            "from": "network",
-            "to": miner_wallet,
-            "amount": amount,
-            "block_hash": block_hash,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-
-        self.wallets[miner_wallet]["transactions"].append(transaction)
-        self.transaction_history.append(transaction)
-
-        # Persist to disk
-        self._save_economy()
-        print(f"💰 {amount:.6f} HSM tokens rewarded to {miner_wallet}")
-
-    def _save_economy(self):
-        """Write current economy state to economy.json"""
-        data = {
-            "token_supply": self.token_supply,
-            "total_wallets": len(self.wallets),
-            "wallets": self.wallets,
-            "transaction_history": self.transaction_history
-        }
-        with open("economy.json", "w") as f:
-            json.dump(data, f, indent=2)
-
-    def get_economy_stats(self):
-        return {
-            "token_supply": self.token_supply,
-            "total_wallets": len(self.wallets),
-            "total_transactions": len(self.transaction_history)
-        }
-
-
 class HSMEnhancedMiner:
     def __init__(self, difficulty:int=4, base_reward:float=0.001):
         self.difficulty = difficulty
@@ -191,14 +122,6 @@ class HSMEnhancedMiner:
            # PMZ-style transformation (example harmonic oscillation)
            result = (result ** 2 + 1) ** 0.5 / (1 + abs(result))
         return result
-
-    def _add_block(self, block):
-       """Add a validated block to the blockchain, computing hash if missing"""
-       if "block_hash" not in block:
-           block["block_hash"] = self._calculate_block_hash(block)
-
-        self.chain.append(block)
-        print(f"🧱 Block added to {self.network}: {block['block_hash'][:12]}")
 
     # -----------------------------------------------------------
     def generate_targeted_nonce(self, data:Dict[str,Any])->Dict[str,Any]:
@@ -239,6 +162,34 @@ class HSMEnhancedMiner:
     def _calc_candidate_hash(self,nonce:int,meta:Dict)->str:
         raw=f"{nonce}:{json.dumps(meta,sort_keys=True)}"
         return hashlib.sha256(raw.encode()).hexdigest()
+
+    def _add_block(self, block):
+        """Add a validated block to the blockchain safely."""
+        try:
+            # Compute a hash if it's missing or empty
+            if not block.get("block_hash"):
+                # Defensive fallback if _calculate_block_hash isn't defined
+                try:
+                    block["block_hash"] = self._calculate_block_hash(block)
+                except Exception:
+                    import hashlib, json
+                    block["block_hash"] = hashlib.sha256(
+                        json.dumps(block, sort_keys=True).encode()
+                    ).hexdigest()
+
+            # Append block
+            self.chain.append(block)
+
+            # Short print
+            short_hash = block.get("block_hash", "NOHASH")[:12]
+            print(f"🧱 Block added to {self.network}: {short_hash}")
+
+        except Exception as e:
+            import json
+            print(f"[!] Failed to add block: {e}")
+        print(f"   Block data: {json.dumps(block, indent=2)[:400]}")
+
+
 
     # -----------------------------------------------------------
     def mine_with_hsm_targeting(self,reports:List[Dict[str,Any]],timeout:int=20)->Optional[Dict]:
@@ -309,7 +260,9 @@ def demonstrate_hsm_enhanced_mining():
         block = miner.mine_with_hsm_targeting(reports, timeout=10)
         if block:
             econ.distribute_rewards(wallet, miner.base_reward, block.get("block_hash", "N/A"))
-            print(f"✅ Block mined | Score {block['threat_score']:.3f} | Reward {miner.base_reward:.6f}")
+            score = block.get("threat_score", 0.0)
+            reward = block.get("reward", miner.base_reward)
+            print(f"? Block mined | Score {score:.3f} | Reward {reward:.6f}")
         else:
             print("⏳ No block found this cycle.")
 
@@ -318,16 +271,91 @@ def demonstrate_hsm_enhanced_mining():
             print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  time={time.strftime('%H:%M:%S')}")
 
         time.sleep(1)
-
+        
 def continuous_mining_loop(miner, threat_reports):
     while True:
         block = miner.mine_with_hsm_targeting(threat_reports, timeout=20)
         if block:
             blockchain._add_block(block)
-            print(f"[+] Block mined: {block['block_hash']} | Reward: {block['threat_score']:.3f}")
+
+            # Fix: pull values directly from the miner’s latest block
+            block_hash = block.get("block_hash", "NOHASH")
+            threat_score = block.get("threat_score", block.get("nonce_metadata", {}).get("trajectory_score", {}).get("ratio", 0.0))
+            reward = block.get("reward", miner.base_reward * (1.0 + threat_score * 2.0))
+
+            print(f"[+] Block mined: {block_hash} | Score: {threat_score:.3f} | Reward: {reward:.6f}")
+
         else:
             print("[-] Timeout, retrying...")
+
         time.sleep(2)
+
+class NWITokenEconomy:
+    def __init__(self):
+        self.token_supply = 0.0
+        self.wallets = {}
+        self.transaction_history = []
+
+    def create_wallet(self, owner_id: str) -> str:
+        """Create a new wallet for an entity."""
+        wallet_address = f"WALLET_{hashlib.sha256(owner_id.encode()).hexdigest()[:16]}"
+        self.wallets[wallet_address] = {
+            "owner": owner_id,
+            "balance": 0.0,
+            "created": datetime.now(timezone.utc).isoformat(),
+            "transactions": []
+        }
+        return wallet_address
+
+    def distribute_rewards(self, miner_wallet: str, amount: float, block_hash: str):
+        """Distribute mining rewards to a wallet and record transaction."""
+        if miner_wallet not in self.wallets:
+            self.wallets[miner_wallet] = {
+                "owner": "unknown_miner",
+                "balance": 0.0,
+                "created": datetime.now(timezone.utc).isoformat(),
+                "transactions": []
+            }
+
+        # Credit wallet and update supply
+        self.wallets[miner_wallet]["balance"] += amount
+        self.token_supply += amount
+
+        # Record transaction
+        transaction = {
+            "tx_id": f"TOKEN-{int(time.time())}",
+            "type": "token_reward",
+            "from": "network",
+            "to": miner_wallet,
+            "amount": amount,
+            "block_hash": block_hash,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+        self.wallets[miner_wallet]["transactions"].append(transaction)
+        self.transaction_history.append(transaction)
+
+        # Persist to disk
+        self._save_economy()
+        print(f"?? {amount:.6f} HSM tokens rewarded to {miner_wallet}")
+
+    def _save_economy(self):
+        """Write current economy state to economy.json"""
+        data = {
+            "token_supply": self.token_supply,
+            "total_wallets": len(self.wallets),
+            "wallets": self.wallets,
+            "transaction_history": self.transaction_history
+        }
+        with open("economy.json", "w") as f:
+            json.dump(data, f, indent=2)
+
+    def get_economy_stats(self):
+        return {
+            "token_supply": self.token_supply,
+            "total_wallets": len(self.wallets),
+            "total_transactions": len(self.transaction_history)
+        }
 
 
 # ===================================================================
