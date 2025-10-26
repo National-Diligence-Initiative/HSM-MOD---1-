@@ -2,88 +2,92 @@
 """
 Crypto-Mining Enhanced NWI Defensive Engine
 HSM-Enhanced Crypto Mining Engine
-Simulated version: all logic preserved, syntax fixed.
 """
 
-import hashlib, time, json, threading, os, secrets
+import os, sys, json, time, hashlib, threading, secrets
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
-from dotenv import load_dotenv
-from engine import BlockchainNWIEngine
-import sys
-from web3 import Web3
-import json, os, time
 
+# 1) Load dotenv FIRST
+from dotenv import load_dotenv
+load_dotenv()
+
+# 2) Optional GPU / CPU math
+try:
+    import cupy as xp
+    gpu_enabled = True
+except ImportError:
+    import numpy as xp  # fallback to numpy
+    gpu_enabled = False
+
+# 3) Web3 from env (optional)
 try:
     from web3 import Web3
     load_web3 = True
 except ImportError:
     load_web3 = False
-    
-w3 = Web3(Web3.HTTPProvider("https://sepolia.infura.io/v3/YOUR_INFURA_KEY"))
-wallet_address = os.getenv("METAMASK_ADDRESS")
-private_key = os.getenv("PRIVATE_KEY")
+
+RPC_URL = os.getenv("RPC_URL", "https://sepolia.infura.io/v3/REPLACE_ME")
+METAMASK_ADDRESS = os.getenv("METAMASK_ADDRESS", "").strip()
+PRIVATE_KEY = os.getenv("PRIVATE_KEY", "").strip()
 HSM_CONTRACT_ADDRESS = os.getenv("HSM_TOKEN_CONTRACT", "").strip()
 HSM_ABI_PATH = os.getenv("HSM_TOKEN_ABI", "hsm_token_abi.json")
 
-# Load ABI safely
-try:
-    with open(HSM_ABI_PATH, "r") as f:
-        HSM_ABI = json.load(f)
-except Exception as e:
-    print(f"[!] Could not load HSM ABI from {HSM_ABI_PATH}: {e}")
-    HSM_ABI = []
+w3 = None
+token_contract = None
+if load_web3 and RPC_URL.startswith("http"):
+    w3 = Web3(Web3.HTTPProvider(RPC_URL))
+    if w3.is_connected() and HSM_CONTRACT_ADDRESS:
+        try:
+            with open(HSM_ABI_PATH, "r") as f:
+                HSM_ABI = json.load(f)
+        except Exception as e:
+            print(f"[!] Could not load HSM ABI at {HSM_ABI_PATH}: {e}")
+            HSM_ABI = []
+        token_contract = w3.eth.contract(address=HSM_CONTRACT_ADDRESS, abi=HSM_ABI)
 
-token_contract = w3.eth.contract(address=HSM_CONTRACT_ADDRESS, abi=HSM_ABI)
 sys.stdout.reconfigure(encoding='utf-8')
+print(f"Connected to wallet: {METAMASK_ADDRESS or 'none'}")
 
-
-try:
-    import cupy as xp  # GPU version
-except ImportError:
-    import numpy as np  # CPU fallback
-
-try:
-    import cupy as xp  # GPU array if available
-    gpu_enabled = True
-except ImportError:
-    xp = np
-    gpu_enabled = False
-
-load_dotenv()
 
 def pmz_gpu(iterations: int, size: int = 10_000):
     x = xp.linspace(0.1, 1.0, size)
     for _ in range(iterations):
         x = xp.sqrt(x ** 2 + 1) / (1 + xp.abs(x))
-    return xp.asnumpy(x) if hasattr(x, "get") else x
+    # cupy arrays have .get(); numpy arrays don't
+    try:
+        return x.get()
+    except Exception:
+        return x
+
+def pmz_recurse(iterations: int, vector: float) -> float:
+    """Finite PMZ-like transform (CPU)."""
+    v = float(vector)
+    for _ in range(iterations):
+        v = ((v * v) + 1.0) ** 0.5 / (1.0 + abs(v))
+    return v
 
 def pmz_live_loop(vector: float = 0.0102, delay: float = 0.01, decay: float = 0.999999):
-    """Optimized continuous PMZ loop with adaptive precision and optional GPU."""
     v = xp.array([vector], dtype=xp.float64)
     t0 = time.time()
-    iteration = 0
-
+    it = 0
     try:
         while True:
-            # core PMZ transform — harmonic convergence function
-            v = xp.sqrt(v ** 2 + 1) / (1 + xp.abs(v))
+            v = xp.sqrt(v ** 2 + 1.0) / (1.0 + xp.abs(v))
             if gpu_enabled:
                 v *= decay
-
-            iteration += 1
-            if iteration % 10000 == 0:
-                current = float(v[0]) if gpu_enabled else v[0]
-                elapsed = time.time() - t0
-                print(f"[PMZ] iter={iteration:,}  vector={current:.8f}  elapsed={elapsed:.2f}s")
+            it += 1
+            if it % 10000 == 0:
+                cur = float(v[0])
+                print(f"[PMZ] iter={it:,} vector={cur:.8f} elapsed={time.time()-t0:.2f}s")
                 t0 = time.time()
             time.sleep(delay)
-
     except KeyboardInterrupt:
-        print("\n🛑 PMZ loop stopped safely.")
-        if gpu_enabled:
-            v = xp.asnumpy(v)
-        return float(v[0])
+        try:
+            return float(v[0])
+        except Exception:
+            return vector
+
 
     def _save_economy(self):
         """Write current economy state to economy.json safely."""
@@ -136,21 +140,36 @@ except ImportError:
 # MAIN MINER
 # ===================================================================
 class HSMEnhancedMiner:
-    def __init__(self, difficulty:int=4, base_reward:float=0.001):
+    def __init__(self, difficulty: int = 4, base_reward: float = 0.001, network: str = "nwi_mainnet"):
         self.difficulty = difficulty
         self.base_reward = base_reward
         self.mining_active = False
         self.miner_id = f"HSM-MINER-{secrets.token_hex(8)}"
         self.wallet_address = f"NWI_{hashlib.sha256(self.miner_id.encode()).hexdigest()[:40]}"
         self.trajectory_engine = TrajectoryMechanic()
+        self.network = network
         self.incident_manager = IncidentManager()
         self.mined_blocks = 0
         self.total_rewards = 0.0
+        self._save_economy()
+        self._save()
         self.threat_based_rewards = 0.0
         self.nonce_patterns = {}
         self.threat_profiles = {}
         print(f"[HSM🔧] Miner Initialized: {self.miner_id}")
-
+    
+    def _save(self):
+        try:
+            data = {
+                "token_supply": round(self.token_supply, 6),
+                "total_wallets": len(self.wallets),
+                "wallets": self.wallets,
+                "transaction_history": self.transaction_history
+            }
+            with open("economy.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"[!] Failed to save economy.json: {e}")
 
     # -----------------------------------------------------------
     def calculate_mining_reward(self, score:float, threat_level:str)->float:
@@ -206,10 +225,6 @@ class HSMEnhancedMiner:
     def _get_success_rate(self)->float:
         return 0.0 if self.mined_blocks==0 else min(1.0,self.mined_blocks/(self.mined_blocks+10))
 
-    def _calc_candidate_hash(self,nonce:int,meta:Dict)->str:
-        raw=f"{nonce}:{json.dumps(meta,sort_keys=True)}"
-        return hashlib.sha256(raw.encode()).hexdigest()
-
     def _add_block(self, block):
         """Add a validated block to the blockchain safely."""
         try:
@@ -257,46 +272,121 @@ class HSMEnhancedMiner:
 
 
     # -----------------------------------------------------------
-    def mine_with_hsm_targeting(self,reports:List[Dict[str,Any]],timeout:int=20)->Optional[Dict]:
+    def _calc_candidate_hash(self, nonce:int, meta:Dict)->str:
+        raw = f"{nonce}:{json.dumps(meta,sort_keys=True)}"
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    def mine_with_hsm_targeting(self, reports:List[Dict[str,Any]], timeout:int=20)->Optional[Dict]:
         if not reports:
-            print("⚠️ No threat reports.")
+            print("⚠️ No reports.")
             return None
-        prefix="0"*self.difficulty
-        best=None; best_score=0.0
-        start=time.time()
+        prefix = "0"*self.difficulty
+        best = None; best_score = -1.0
+        start = time.time()
         for r in reports:
-            meta=self.generate_targeted_nonce(r)
-            for n in range(*meta["nonce_range"]):
-                if time.time()-start>timeout: break
-                h=self._calc_candidate_hash(n,meta)
+            # simple trajectory score
+            c = r.get("courage",0); d = r.get("dexterity",0)
+            m = r.get("clause_matter",0); a = r.get("audacity",0)
+            ratio = (c+d+m+a)/4.0
+            meta = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "miner_id": self.miner_id,
+                "network": self.network,
+                "trajectory_ratio": ratio,
+                "difficulty": self.difficulty,
+                "report_id": r.get("id","")
+            }
+            # quick nonce sweep
+            n = 0
+            while time.time()-start < timeout:
+                h = self._calc_candidate_hash(n, meta)
                 if h.startswith(prefix):
-                    ratio=meta["trajectory_score"]["ratio"]
-                    if ratio>best_score:
-                        best={"hash":h,"nonce":n,"meta":meta,"score":ratio}
-                        best_score=ratio
+                    if ratio > best_score:
+                        best = {"block_hash": h, "nonce": n, "meta": meta, "threat_score": ratio}
+                        best_score = ratio
                     break
+                n += 1
         if best:
-            reward=self.calculate_mining_reward(best["score"],"HIGH")
-            self.mined_blocks+=1; self.total_rewards+=reward
-            print(f"✅ Block mined | Score {best['score']:.3f} | Reward {reward:.6f}")
+            self.mined_blocks += 1
+            reward = self.calculate_mining_reward(best["threat_score"], "HIGH")
+            self.total_rewards += reward
+            best["reward"] = reward
+            print(f"✅ Block mined | Score {best['threat_score']:.3f} | Reward {reward:.6f}")
             return best
         print("❌ Timeout - no block found.")
         return None
 
-
 # ===================================================================
 class NWITokenEconomy:
-    def __init__(self):
-        self.wallets={}; self.tx_history=[]; self.supply=0.0
-    def create_wallet(self,owner:str)->str:
-        addr=f"WALLET_{hashlib.sha256(owner.encode()).hexdigest()[:16]}"
-        self.wallets[addr]={"owner":owner,"balance":0.0}; return addr
-    def credit(self,addr:str,amt:float):
-        if addr not in self.wallets: self.create_wallet(addr)
-        self.wallets[addr]["balance"]+=amt; self.supply+=amt
-        self.tx_history.append({"to":addr,"amt":amt,"time":utc_now_iso()})
-    def stats(self)->Dict[str,Any]:
-        return {"wallets":len(self.wallets),"supply":self.supply,"txs":len(self.tx_history)}
+    def __init__(self, path="economy.json"):
+        self.path = path
+        self.token_supply = 0.0
+        self.wallets = {}
+        self.transaction_history = []
+
+    def _save(self):
+        try:
+            data = {
+                "token_supply": round(self.token_supply, 6),
+                "total_wallets": len(self.wallets),
+                "wallets": self.wallets,
+                "transaction_history": self.transaction_history
+            }
+            with open(self.path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"[!] Failed to save {self.path}: {e}")
+
+    def create_wallet(self, owner_id: str) -> str:
+        addr = f"WALLET_{hashlib.sha256(owner_id.encode()).hexdigest()[:16]}"
+        if addr not in self.wallets:
+            self.wallets[addr] = {
+                "owner": owner_id,
+                "balance": 0.0,
+                "created": datetime.now(timezone.utc).isoformat(),
+                "transactions": []
+            }
+        return addr
+
+    def distribute_rewards(self, miner_wallet: str, amount: float, block_hash: str):
+        if miner_wallet not in self.wallets:
+            self.create_wallet(miner_wallet)
+        self.wallets[miner_wallet]["balance"] += amount
+        self.token_supply += amount
+
+        tx = {
+            "tx_id": f"TOKEN-{int(time.time())}",
+            "type": "token_reward",
+            "from": "network",
+            "to": miner_wallet,
+            "amount": amount,
+            "block_hash": block_hash,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        self.wallets[miner_wallet]["transactions"].append(tx)
+        self.transaction_history.append(tx)
+        self._save()
+        print(f"💾 Local reward: {amount:.6f} HSM → {miner_wallet}")
+
+        # Optional: try on-chain send (requires funded token or mint authority)
+        if token_contract and w3 and METAMASK_ADDRESS and PRIVATE_KEY:
+            try:
+                decimals = token_contract.functions.decimals().call()
+                wei_amount = int(amount * (10 ** decimals))
+                nonce = w3.eth.get_transaction_count(METAMASK_ADDRESS)
+                tx = token_contract.functions.transfer(METAMASK_ADDRESS, wei_amount).build_transaction({
+                    "from": METAMASK_ADDRESS,
+                    "nonce": nonce,
+                    "gas": 100000,
+                    "gasPrice": w3.to_wei("5", "gwei"),
+                })
+                signed = w3.eth.account.sign_transaction(tx, private_key=PRIVATE_KEY)
+                tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+                print(f"🌐 On-chain sent {amount:.6f} HSM → {METAMASK_ADDRESS}  TX: {tx_hash.hex()}")
+            except Exception as e:
+                print(f"⚠️ On-chain send failed: {e}")
+        else:
+            print("🔒 On-chain disabled (missing RPC/ABI/contract or keys).")
 
 
 # ===================================================================
@@ -466,54 +556,89 @@ def _save_economy(self):
 
 # ===================================================================
 if __name__ == "__main__":
-    # Initialize miner and economy
-    blockchain = BlockchainNWIEngine(network="nwi_mainnet")
-    hsm_miner = HSMEnhancedMiner(difficulty=3, base_reward=0.01)
 
+    try:
+        from engine import BlockchainNWIEngine
+        blockchain = BlockchainNWIEngine(network="nwi_mainnet")
+        def append_block(b):
+            try:
+                blockchain.add_block(b)  # use the engine's proper API
+            except Exception:
+                # fallback: just print
+                sh = b.get("block_hash","")[:12]
+                print(f"🧱 Block added (engine unavailable): {sh}")
+    except Exception:
+        blockchain = None
+        def append_block(b):
+            sh = b.get("block_hash","")[:12]
+            print(f"🧱 Block added: {sh}")
+
+    miner = HSMEnhancedMiner(difficulty=3, base_reward=0.01, network="nwi_mainnet")
     econ = NWITokenEconomy()
-    wallet = econ.create_wallet(hsm_miner.miner_id)
+    wallet = econ.create_wallet(miner.miner_id)
 
-    # Example threat data
-    threat_reports = [
-        {"id": "LIVE-1", "lat": 37.22, "lon": -77.40,
-         "courage": 0.8, "dexterity": 0.7, "clause_matter": 0.85, "audacity": 0.6},
-        {"id": "LIVE-2", "lat": 37.54, "lon": -77.43,
-         "courage": 0.7, "dexterity": 0.6, "clause_matter": 0.75, "audacity": 0.5}
+    reports = [
+        {"id":"LIVE-1","lat":37.22,"lon":-77.40,"courage":0.8,"dexterity":0.7,"clause_matter":0.85,"audacity":0.6},
+        {"id":"LIVE-2","lat":37.54,"lon":-77.43,"courage":0.7,"dexterity":0.6,"clause_matter":0.75,"audacity":0.5},
     ]
 
-    print(f"Connected to wallet: {wallet}")
-    print(f"🔧 HSM Miner Initialized: {hsm_miner.miner_id}")
-
-    # PMZ initialization
-    pmz_vector = 0.0102
-    iteration = 0
-    base_delay = 0.05
-    continuous_mining_loop(hsm_miner, threat_reports)
-
-    # Continuous subquantum loop
+    print(f"🔧 HSM Miner Initialized: {miner.miner_id}")
     while True:
-        iteration += 1
-        pmz_vector = (pmz_vector * 1.00037) % 1.0  # self-stabilizing PMZ rotation
-
-        # Update difficulty dynamically based on PMZ vector balance
-        hsm_miner.difficulty = max(1, int(4 * (1.0 - pmz_vector)))
-        start_nonce = int(time.time() * 1000) % 1000000
-
-        # Attempt mining
-        block = hsm_miner.mine_with_hsm_targeting(threat_reports, timeout=12)
+        block = miner.mine_with_hsm_targeting(reports, timeout=12)
         if block:
-            econ.distribute_rewards(wallet, hsm_miner.base_reward, block.get("block_hash", "N/A"))
-            print(f"✅ Block mined | Score {block['threat_score']:.3f} | Reward {hsm_miner.base_reward:.6f}")
+            append_block(block)
+            econ.distribute_rewards(wallet, block["reward"], block["block_hash"])
         else:
-            print("⏳ No block found this cycle.")
+            print("⏳ No block this cycle.")
+        time.sleep(1)
 
-        # Every 20 iterations print system state
-        if iteration % 20 == 0:
-            print(f"=== ECONOMY === {{'wallets': {len(econ.wallets)}, 'supply': {econ.token_supply:.3f}, 'txs': {len(econ.transaction_history)}}}")
-            print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
+        # Initialize miner and economy
+        blockchain = BlockchainNWIEngine(network="nwi_mainnet")
+        hsm_miner = HSMEnhancedMiner(difficulty=3, base_reward=0.01)
 
-        time.sleep(base_delay)
+        econ = NWITokenEconomy()
+        wallet = econ.create_wallet(hsm_miner.miner_id)
 
+        # Example threat data
+        threat_reports = [
+            {"id": "LIVE-1", "lat": 37.22, "lon": -77.40,
+            "courage": 0.8, "dexterity": 0.7, "clause_matter": 0.85, "audacity": 0.6},
+            {"id": "LIVE-2", "lat": 37.54, "lon": -77.43,
+            "courage": 0.7, "dexterity": 0.6, "clause_matter": 0.75, "audacity": 0.5}
+        ]
+
+        print(f"Connected to wallet: {wallet}")
+        print(f"🔧 HSM Miner Initialized: {hsm_miner.miner_id}")
+
+        # PMZ initialization
+        pmz_vector = 0.0102
+        iteration = 0
+        base_delay = 0.05
+        continuous_mining_loop(hsm_miner, threat_reports)
+        
+        # Continuous subquantum loop
+        while True:
+            iteration += 1
+            pmz_vector = (pmz_vector * 1.00037) % 1.0  # self-stabilizing PMZ rotation
+
+            # Update difficulty dynamically based on PMZ vector balance
+            hsm_miner.difficulty = max(1, int(4 * (1.0 - pmz_vector)))
+            start_nonce = int(time.time() * 1000) % 1000000
+
+            # Attempt mining
+            block = hsm_miner.mine_with_hsm_targeting(threat_reports, timeout=12)
+            if block:
+                econ.distribute_rewards(wallet, hsm_miner.base_reward, block.get("block_hash", "N/A"))
+                print(f"✅ Block mined | Score {block['threat_score']:.3f} | Reward {hsm_miner.base_reward:.6f}")
+            else:
+                print("⏳ No block found this cycle.")
+
+            # Every 20 iterations print system state
+            if iteration % 20 == 0:
+                print(f"=== ECONOMY === {{'wallets': {len(econ.wallets)}, 'supply': {econ.token_supply:.3f}, 'txs': {len(econ.transaction_history)}}}")
+                print(f"[PMZ] iter={iteration:,}  vector={pmz_vector:.8f}  difficulty={hsm_miner.difficulty}  time={time.strftime('%H:%M:%S')}")
+
+            time.sleep(base_delay)
 
 
 
