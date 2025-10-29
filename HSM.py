@@ -86,6 +86,90 @@ def sha256_file(path: str) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+from shapely.geometry import Point, Polygon
+import json
+
+def load_census_data(country="US", county="Henrico", state="VA"):
+    """
+    Load boundary data using a GeoJSON library (e.g., census boundary).
+    Replace this with actual data from a GeoJSON file or API.
+    """
+    # Placeholder: Assume a GeoJSON structure with "coordinates" polygon.
+    boundary_polygon = [
+        [-77.501, 37.5]  # Hardcode a simplified polygon for demonstration. Replace with real data.
+        # Add more coordinates here to outline the county.
+    ]
+    return Polygon(boundary_polygon)
+
+def validate_report(report: Dict) -> Tuple[bool, str]:
+    """Validate report structure and geolocation."""
+    _, msg = geofence_validation(report)
+    if not msg.startswith("Valid location"):
+        return False, "Report outside Henrico County"
+    # ... original validation logic ...
+    return True, "Valid"
+
+MALICIOUS_KEYWORDS = {"exploit", "shellcode", "cmd.ps1"}
+MALICIOUS_HASHES = {"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+
+def _is_malicious_metadata(text: str, metadata: Dict) -> bool:
+    """Check for known malicious patterns in text/metadata."""
+    text_lower = text.lower()
+    if any(keyword in text_lower for keyword in MALICIOUS_KEYWORDS):
+        return True
+    if metadata.get("hash") and metadata["hash"] in MALICIOUS_HASHES:
+        return True
+    return False
+
+def score(self, courage, dexterity, clause_matter, audacity):
+    # Original scoring logic
+    C, D, M, A = self._clamp(courage), self._clamp(dexterity), self._clamp(clause_matter), self._clamp(audacity)
+    numerator = C + D + M + A
+    denominator = 4.0 * max(self.honor, 1e-6)
+    ratio = round(numerator / denominator, 4)
+    
+    # Additional score boost if report is within Henrico County and contains malicious metadata
+    if self._is_in_henrico(report["lat"], report["lon"]) and _is_malicious_metadata(text, metadata):
+        ratio += 0.2  # Boost score for malicious reports in Henrico
+        return {"C": C, "D": D, "M": M, "A": A, "ratio": ratio, "phase": "Critical (Henrico Alert)"}
+
+    # Original phase logic
+    phase = self._phase_name(ratio)
+    return {"C": C, "D": D, "M": M, "A": A, "ratio": ratio, "phase": phase}
+
+def search_historical_reports(self, location_filter: str = "Henrico County", keyword: str = "") -> List:
+    """Search stored reports for matching criteria."""
+    matches = []
+    with open(self.incidents_file, "r") as f:
+        for line in f:
+            report = json.loads(line)
+            if "meta" in report and _is_malicious_metadata(report.get("text", ""), report["meta"]):
+                if location_filter in report.get("meta", {}).get("location", ""):
+                    matches.append(report)
+    return matches
+
+manager = IncidentManager()
+
+# Example report from Henrico County with malicious metadata
+malicious_report = {
+    "text": "Download this file to exploit your system",
+    "lat": 37.5412,  # Within Henrico County
+    "lon": -77.3250,
+    "meta": {"hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "location": "Henrico, VA"}
+}
+
+try:
+    record = manager.ingest_report(malicious_report)
+    print(f"Detected malicious report in Henrico: {record['id']}")
+except ValueError as e:
+    print(f"Validation failed: {e}")
+
+# Attach the Henrico boundary to the IncidentManager class.
+class IncidentManager:
+    def __init__(self, threshold=SCORE_THRESHOLD, webhook=ALERT_WEBHOOK):
+        self.henrico_boundary = load_census_data()
+        # ... rest of initialization ..
+
 def append_ledger(record: Dict[str, Any]) -> str:
     """Thread-safe ledger appending with file locking"""
     fname = os.path.join(LEDGER_DIR, f"ledger_{datetime.utcnow().strftime('%Y%m%d')}.ndjson")
